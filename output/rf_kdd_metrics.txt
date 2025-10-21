@@ -1,0 +1,18 @@
+Best params:
+{'max_depth': 16, 'max_features': 'log2', 'min_samples_leaf': 1, 'min_samples_split': 4, 'n_estimators': 121}
+
+Accuracy: 0.9987299067275253
+ROC AUC: 0.9999956121881989
+Classification report:
+              precision    recall  f1-score   support
+
+           0     0.9987    0.9989    0.9988     13469
+           1     0.9987    0.9986    0.9986     11726
+
+    accuracy                         0.9987     25195
+   macro avg     0.9987    0.9987    0.9987     25195
+weighted avg     0.9987    0.9987    0.9987     25195
+
+Confusion matrix:
+[[13454    15]
+ [   17 11709]]
