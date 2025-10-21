@@ -1,4 +1,4 @@
-# 🛡️ Sistema de Detección de Intrusiones con Random Forest
+# 🛡️ Modelo de Detección de Intrusiones con Random Forest
 
 Sistema de Machine Learning para detección de intrusiones de red utilizando **Random Forest** sobre el dataset **KDD Cup 1999**. El modelo clasifica el tráfico de red en dos categorías: **Normal** y **Attack** (intrusión).
 
