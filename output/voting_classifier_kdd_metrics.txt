@@ -1,0 +1,31 @@
+======================================================================
+VOTING CLASSIFIER (ENSEMBLE) - RESULTADOS
+======================================================================
+
+Modelos combinados:
+  - Random Forest
+  - Gradient Boosting
+  - AdaBoost
+  - Logistic Regression
+
+Voting strategy: soft (probabilidades)
+
+F1-Score (CV): 0.9992 (+/- 0.0002)
+
+Accuracy: 0.999365
+ROC AUC: 0.999996
+
+Classification report:
+              precision    recall  f1-score   support
+
+           0     0.9996    0.9993    0.9994     13469
+           1     0.9991    0.9995    0.9993     11726
+
+    accuracy                         0.9994     25195
+   macro avg     0.9994    0.9994    0.9994     25195
+weighted avg     0.9994    0.9994    0.9994     25195
+
+
+Confusion matrix:
+[[13459    10]
+ [    6 11720]]

@@ -1,0 +1,26 @@
+======================================================================
+GRADIENT BOOSTING MACHINE - RESULTADOS
+======================================================================
+
+Best params:
+{'learning_rate': np.float64(0.12236203565420874), 'max_depth': 7, 'max_features': None, 'min_samples_leaf': 3, 'min_samples_split': 9, 'n_estimators': 70, 'subsample': np.float64(0.6624074561769746)}
+
+Best F1-Score (CV): 0.9993
+
+Accuracy: 0.999444
+ROC AUC: 0.999998
+
+Classification report:
+              precision    recall  f1-score   support
+
+           0     0.9996    0.9993    0.9995     13469
+           1     0.9992    0.9996    0.9994     11726
+
+    accuracy                         0.9994     25195
+   macro avg     0.9994    0.9995    0.9994     25195
+weighted avg     0.9994    0.9994    0.9994     25195
+
+
+Confusion matrix:
+[[13460     9]
+ [    5 11721]]

@@ -1,0 +1,26 @@
+======================================================================
+ADABOOST CLASSIFIER - RESULTADOS
+======================================================================
+
+Best params:
+{'learning_rate': np.float64(0.6086584841970366), 'n_estimators': 152}
+
+Best F1-Score (CV): 0.9988
+
+Accuracy: 0.998968
+ROC AUC: 0.999993
+
+Classification report:
+              precision    recall  f1-score   support
+
+           0     0.9993    0.9987    0.9990     13469
+           1     0.9986    0.9992    0.9989     11726
+
+    accuracy                         0.9990     25195
+   macro avg     0.9989    0.9990    0.9990     25195
+weighted avg     0.9990    0.9990    0.9990     25195
+
+
+Confusion matrix:
+[[13452    17]
+ [    9 11717]]
