@@ -19,11 +19,11 @@ class NetworkMonitor {
       lastUpdate: Date.now()
     };
     
-    // Configuración de detección
+    // Configuración de detección (UMBRALES REDUCIDOS PARA PRUEBAS)
     this.config = {
-      ddosThreshold: 100,        // Peticiones por segundo
+      ddosThreshold: 5,          // Peticiones por segundo (reducido para pruebas)
       ddosTimeWindow: 1000,      // 1 segundo
-      bruteForceThreshold: 10,   // Intentos fallidos
+      bruteForceThreshold: 3,    // Intentos fallidos (reducido para pruebas)
       bruteForceTimeWindow: 60000, // 1 minuto
       suspiciousPatterns: [
         /admin/i,
@@ -32,7 +32,8 @@ class NetworkMonitor {
         /\.env/i,
         /\.git/i,
         /wp-admin/i,
-        /phpmyadmin/i
+        /phpmyadmin/i,
+        /api/i  // Agregar para detectar /api/login
       ]
     };
     
@@ -40,24 +41,53 @@ class NetworkMonitor {
   }
   
   init() {
+    console.log('🔧 Initializing Network Monitor...');
+    
+    // Verificar que webRequest esté disponible
+    if (!chrome.webRequest) {
+      console.error('❌ chrome.webRequest is not available!');
+      console.error('   Check manifest.json permissions');
+      return;
+    }
+    
+    console.log('✅ chrome.webRequest is available');
+    
     // Escuchar peticiones de red
-    chrome.webRequest.onBeforeRequest.addListener(
-      (details) => this.onRequest(details),
-      { urls: ["<all_urls>"] },
-      ["requestBody"]
-    );
+    try {
+      chrome.webRequest.onBeforeRequest.addListener(
+        (details) => {
+          console.log('📡 Request detected:', details.url);
+          this.onRequest(details);
+        },
+        { urls: ["<all_urls>"] },
+        ["requestBody"]
+      );
+      console.log('✅ onBeforeRequest listener added');
+    } catch (e) {
+      console.error('❌ Error adding onBeforeRequest listener:', e);
+    }
     
     // Escuchar respuestas
-    chrome.webRequest.onCompleted.addListener(
-      (details) => this.onResponse(details),
-      { urls: ["<all_urls>"] }
-    );
+    try {
+      chrome.webRequest.onCompleted.addListener(
+        (details) => this.onResponse(details),
+        { urls: ["<all_urls>"] }
+      );
+      console.log('✅ onCompleted listener added');
+    } catch (e) {
+      console.error('❌ Error adding onCompleted listener:', e);
+    }
     
     // Escuchar errores
-    chrome.webRequest.onErrorOccurred.addListener(
-      (details) => this.onError(details),
-      { urls: ["<all_urls>"] }
-    );
+    try {
+      chrome.webRequest.onErrorOccurred.addListener(
+        (details) => this.onError(details),
+        { urls: ["<all_urls>"] }
+      );
+      console.log('✅ onErrorOccurred listener added');
+    } catch (e) {
+      console.error('❌ Error adding onErrorOccurred listener:', e);
+    }
     
     // Análisis periódico
     chrome.alarms.create('analyzeTraffic', { periodInMinutes: 1 });
@@ -67,7 +97,7 @@ class NetworkMonitor {
       }
     });
     
-    console.log('Network Monitor initialized');
+    console.log('✅ Network Monitor initialized successfully!');
   }
   
   onRequest(details) {
