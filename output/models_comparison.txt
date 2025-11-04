@@ -29,10 +29,10 @@ TIEMPOS DE PREDICCION
 
 Modelo                    Tiempo (s)    Muestras/seg
 --------------------------------------------------------------------------------
-Gradient Boosting             0.1666       151225.09
-Voting Classifier             1.8154        13878.74
-AdaBoost                      1.5420        16338.74
-Random Forest                 0.2275       110755.86
+Gradient Boosting             0.1170       215422.02
+Voting Classifier             1.5354        16409.00
+AdaBoost                      2.2133        11383.20
+Random Forest                 0.2094       120315.20
 
 
 ================================================================================

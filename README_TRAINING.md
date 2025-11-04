@@ -1,4 +1,4 @@
-# 📊 Documentación del Proyecto de Detección de Intrusiones con Random Forest
+# 📊 Detección de Intrusiones con Random Forest
 
 ## 📋 Índice
 1. [Descripción General](#descripción-general)
