@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Network Analyzer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          <h1>Network Analyzer</h1>
+        </div>
+        <div class="status" id="apiStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Conectando...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Model Info Section -->
+    <section class="section" id="modelSection">
+      <div class="section-header">
+        <h2>Información del Modelo</h2>
+        <button class="btn-refresh" id="refreshModel" title="Actualizar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="model-info" id="modelInfo">
+        <div class="loading">Cargando información del modelo...</div>
+      </div>
+    </section>
+
+    <!-- File Upload Section -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Analizar Datos</h2>
+      </div>
+      <div class="upload-area" id="uploadArea">
+        <input type="file" id="fileInput" accept=".csv" hidden>
+        <label for="fileInput" class="upload-label">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span class="upload-text">Seleccionar archivo CSV</span>
+          <span class="upload-hint">o arrastra y suelta aquí</span>
+        </label>
+        <div class="file-info" id="fileInfo" style="display: none;">
+          <div class="file-name" id="fileName"></div>
+          <button class="btn-remove" id="removeFile">×</button>
+        </div>
+      </div>
+      <button class="btn-primary" id="analyzeBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        Analizar
+      </button>
+    </section>
+
+    <!-- Results Section -->
+    <section class="section" id="resultsSection" style="display: none;">
+      <div class="section-header">
+        <h2>Resultados del Análisis</h2>
+      </div>
+      <div class="results" id="results"></div>
+    </section>
+
+    <!-- Loading Overlay -->
+    <div class="overlay" id="loadingOverlay" style="display: none;">
+      <div class="spinner"></div>
+      <p>Analizando datos...</p>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Powered by Gradient Boosting ML</p>
+      <a href="#" id="openDashboard" class="link">Abrir Dashboard Completo</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
