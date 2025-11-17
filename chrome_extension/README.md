@@ -1,15 +1,21 @@
 # 🔌 Extensión de Chrome - Gradient Boosting Network Analyzer
 
-Extensión de Chrome para analizar tráfico de red y detectar intrusiones usando el modelo de Gradient Boosting Machine Learning directamente desde tu navegador.
+Extensión de Chrome para **detectar intrusiones en tiempo real** usando un sistema híbrido que combina **reglas heurísticas** con **predicciones de Machine Learning** (Gradient Boosting).
 
 ## 🌟 Características
 
-- ✅ **Análisis Rápido**: Analiza archivos CSV directamente desde el navegador
-- 📊 **Dashboard Integrado**: Visualiza resultados sin salir de Chrome
-- 🔔 **Notificaciones**: Alertas automáticas para amenazas detectadas
-- 💾 **Historial**: Guarda los últimos 10 análisis
-- ⚡ **Acceso Rápido**: Popup accesible con un clic
-- 🎯 **Información del Modelo**: Ve las métricas del modelo en tiempo real
+### 🔴 Detección en Tiempo Real
+- 🤖 **Predicciones ML**: Analiza tráfico HTTP con el modelo Gradient Boosting
+- ⚡ **Detección por Reglas**: Identifica DDoS, Brute Force y patrones sospechosos
+- 📊 **Monitoreo Continuo**: Captura y analiza cada request HTTP
+- 🎯 **Nivel de Amenaza**: Clasificación automática (low/medium/high)
+
+### 📈 Análisis y Visualización
+- ✅ **Análisis CSV**: Analiza archivos de tráfico offline
+- 📊 **Dashboard Integrado**: Visualiza estadísticas en tiempo real
+- 🔔 **Notificaciones Inteligentes**: Alertas con confianza ML
+- 💾 **Exportación de Datos**: 3 formatos (JSON, CSV HTTP, CSV KDD)
+- ⚡ **Acceso Rápido**: Popup con métricas en vivo
 
 ## 📦 Instalación
 
@@ -197,15 +203,70 @@ feature_0,feature_1,feature_2,...,binario
 - ✅ El historial se guarda solo en tu navegador
 - ✅ Puedes borrar el historial en cualquier momento
 
+## 🧠 Sistema Híbrido ML + Reglas
+
+### Arquitectura
+
+```
+Chrome Extension → Captura HTTP → Network Monitor
+                                        ↓
+                    [Detección por Reglas] (Inmediata)
+                                        ↓
+                    [Cada 10 requests] → Backend API
+                                        ↓
+                    HTTPToKDDAdapter → Convierte HTTP a KDD
+                                        ↓
+                    Gradient Boosting Model → Predice
+                                        ↓
+                    Extension ← Recibe predicciones ML
+```
+
+### Tipos de Detección
+
+#### 1. Detección por Reglas (Inmediata)
+- **DDoS**: > 5 requests/segundo al mismo dominio
+- **Brute Force**: > 3 intentos fallidos (401/403) en 1 minuto
+- **Patrones Sospechosos**: URLs con `/admin`, `/login`, `/.env`, etc.
+
+#### 2. Detección por ML (Cada 10 requests)
+- **Adaptador HTTP→KDD**: Convierte tráfico HTTP a 119 features KDD
+- **Predicción**: Modelo clasifica cada request (normal/attack)
+- **Confianza**: Probabilidad de la predicción (0-100%)
+- **Nivel de Amenaza**: Basado en attack_probability
+
+### Features Mapeadas
+
+| HTTP Data | KDD Feature | Descripción |
+|-----------|-------------|-------------|
+| `duration` | `duration` | Tiempo de respuesta (ms→s) |
+| `requestSize` | `src_bytes` | Bytes enviados |
+| `responseSize` | `dst_bytes` | Bytes recibidos |
+| `statusCode == 200` | `logged_in` | Login exitoso |
+| `count(401, 403)` | `num_failed_logins` | Intentos fallidos |
+| URL analysis | `service` | Tipo de servicio (http, auth, ftp) |
+| Status code | `flag` | Estado de conexión (SF, REJ, S0) |
+
+### Limitaciones
+
+⚠️ **Importante**: El modelo fue entrenado con el dataset KDD (tráfico TCP/IP de red), pero la extensión captura tráfico HTTP del navegador. El adaptador hace el mejor mapeo posible, pero:
+
+- Algunas features KDD no tienen equivalente en HTTP (se simulan)
+- La precisión puede variar según el tipo de ataque
+- Ataques DDoS y Brute Force tienen mejor detección
+- No es detección en tiempo real estricto (batch de 10 requests)
+
 ## 🚀 Próximas Funcionalidades
 
+- [ ] Bloqueo automático de requests maliciosos
+- [ ] Modelo TensorFlow.js en el navegador (sin latencia)
+- [ ] Reentrenamiento con datos HTTP reales
+- [ ] Whitelist/Blacklist de dominios
 - [ ] Análisis de múltiples archivos
 - [ ] Exportar resultados a PDF
 - [ ] Gráficos interactivos en el popup
 - [ ] Comparación de análisis históricos
 - [ ] Configuración de umbrales personalizados
 - [ ] Modo oscuro
-- [ ] Atajos de teclado personalizables
 
 ## 📝 Desarrollo
 
@@ -263,8 +324,63 @@ Si encuentras problemas:
 3. Revisa la consola de Chrome para errores
 4. Reporta el issue con detalles específicos
 
+## 📊 Exportación de Datos
+
+La extensión exporta **3 archivos** al hacer click en "Exportar Datos":
+
+### 1. `traffic-export-[timestamp].json`
+- **Formato**: JSON completo
+- **Uso**: Análisis general, debugging
+- **Contenido**: Tráfico + estadísticas + ataques
+
+### 2. `traffic-data-[timestamp].csv`
+- **Formato**: CSV HTTP (8 columnas)
+- **Uso**: Análisis de tráfico web
+- **Columnas**: url, method, statusCode, timestamp, duration, requestSize, responseSize, domain
+- ⚠️ **NO compatible** con el modelo ML
+
+### 3. `traffic-kdd-[timestamp].csv` ⭐
+- **Formato**: CSV KDD (119 features)
+- **Uso**: Predicciones con el modelo ML
+- **Columnas**: duration, src_bytes, dst_bytes, protocol_type_*, service_*, flag_*, etc.
+- ✅ **Compatible** con el modelo ML
+
+**Importante**: Para usar el modelo ML, siempre usa el archivo `traffic-kdd-*.csv`
+
+Ver **[EXPLICACION_CSV_EXPORTS.md](EXPLICACION_CSV_EXPORTS.md)** para más detalles.
+
+## 📚 Documentación Adicional
+
+- **[INSTALACION.md](INSTALACION.md)**: Guía detallada de instalación
+- **[GUIA_PRUEBAS.md](GUIA_PRUEBAS.md)**: Cómo probar la extensión
+- **[MONITOREO_TIEMPO_REAL.md](MONITOREO_TIEMPO_REAL.md)**: Monitoreo en tiempo real
+- **[EXPLICACION_CSV_EXPORTS.md](EXPLICACION_CSV_EXPORTS.md)**: Diferencia entre los CSVs exportados
+- **[INDEX.md](INDEX.md)**: Índice completo de documentación
+
+## 🎯 Valor Real del Sistema
+
+### ✅ Lo que SÍ hace
+- Detecta ataques HTTP reales (DDoS, Brute Force)
+- Usa el modelo ML entrenado para predicciones
+- Proporciona métricas de confianza
+- Exporta datos para análisis offline
+- Combina velocidad (reglas) con precisión (ML)
+
+### ⚠️ Limitaciones Honestas
+- Mapeo HTTP→KDD no es perfecto
+- Algunas features son aproximadas
+- Latencia de predicción (batch processing)
+- Precisión variable según tipo de ataque
+
+### 🎓 Aprendizajes
+- Sistema híbrido es más robusto que solo reglas o solo ML
+- Adaptación de dominios (KDD→HTTP) es posible pero imperfecta
+- Exportación de datos permite mejora continua
+- Base sólida para evolucionar el sistema
+
 ---
 
-**Versión**: 1.0.0  
+**Versión**: 2.0.0 (Sistema Híbrido ML)  
 **Última actualización**: Noviembre 2024  
-**Compatible con**: Chrome 88+, Edge 88+, Brave
+**Compatible con**: Chrome 88+, Edge 88+, Brave  
+**Modelo**: Gradient Boosting (KDD Dataset)

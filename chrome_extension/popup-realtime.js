@@ -13,6 +13,9 @@ const clearAttacks = document.getElementById('clearAttacks');
 const viewDashboard = document.getElementById('viewDashboard');
 const exportData = document.getElementById('exportData');
 const uptime = document.getElementById('uptime');
+const mlPredictions = document.getElementById('mlPredictions');
+const mlStatus = document.getElementById('mlStatus');
+const threatLevel = document.getElementById('threatLevel');
 
 let startTime = Date.now();
 let updateInterval = null;
@@ -87,6 +90,14 @@ function displayStats(stats) {
   totalRequests.textContent = stats.totalRequests.toLocaleString();
   suspiciousCount.textContent = stats.suspiciousActivity.toLocaleString();
   
+  // Display ML predictions count
+  if (mlPredictions && stats.mlPredictions !== undefined) {
+    mlPredictions.textContent = stats.mlPredictions.toLocaleString();
+  }
+  
+  // Display ML status and threat level
+  displayMLStatus();
+  
   // Display recent traffic
   if (stats.recentRequests && stats.recentRequests.length > 0) {
     displayTraffic(stats.recentRequests);
@@ -97,12 +108,35 @@ function displayStats(stats) {
   }
 }
 
+// Display ML status and threat level
+function displayMLStatus() {
+  chrome.storage.local.get(['mlLastPrediction'], (result) => {
+    if (result.mlLastPrediction && mlStatus && threatLevel) {
+      const prediction = result.mlLastPrediction;
+      const timeDiff = Date.now() - prediction.timestamp;
+      const minutesAgo = Math.floor(timeDiff / 60000);
+      
+      mlStatus.textContent = minutesAgo < 5 ? 'Activo' : 'Esperando tráfico';
+      mlStatus.className = minutesAgo < 5 ? 'ml-status active' : 'ml-status waiting';
+      
+      if (prediction.summary && threatLevel) {
+        const level = prediction.summary.threat_level;
+        const attackPercentage = prediction.summary.attack_percentage.toFixed(1);
+        
+        threatLevel.textContent = `${level.toUpperCase()} (${attackPercentage}% ataques)`;
+        threatLevel.className = `threat-level ${level}`;
+      }
+    }
+  });
+}
+
 // Display attacks
 function displayAttacks(attacks) {
   const allAttacks = [
-    ...attacks.ddos.map(a => ({ ...a, type: 'DDoS' })),
-    ...attacks.bruteForce.map(a => ({ ...a, type: 'Brute Force' })),
-    ...attacks.suspicious.map(a => ({ ...a, type: 'Suspicious' }))
+    ...attacks.ddos.map(a => ({ ...a, category: 'DDoS' })),
+    ...attacks.bruteForce.map(a => ({ ...a, category: 'Brute Force' })),
+    ...attacks.suspicious.map(a => ({ ...a, category: 'Suspicious' })),
+    ...(attacks.mlDetected || []).map(a => ({ ...a, category: 'ML Detected' }))
   ];
   
   // Sort by timestamp (most recent first)
@@ -123,31 +157,46 @@ function displayAttacks(attacks) {
   let html = '<div class="attacks-list">';
   
   allAttacks.slice(0, 10).forEach(attack => {
-    const severityClass = attack.severity || 'low';
-    const icon = getAttackIcon(attack.type);
-    const time = formatTime(attack.timestamp);
-    
-    html += `
-      <div class="attack-item ${severityClass}">
-        <div class="attack-icon">${icon}</div>
-        <div class="attack-details">
-          <div class="attack-header">
-            <span class="attack-type">${attack.type}</span>
-            <span class="attack-time">${time}</span>
-          </div>
-          <div class="attack-target">${truncateUrl(attack.target)}</div>
-          ${attack.requestCount ? `<div class="attack-meta">${attack.requestCount} peticiones</div>` : ''}
-          ${attack.failureCount ? `<div class="attack-meta">${attack.failureCount} intentos fallidos</div>` : ''}
-        </div>
-        <div class="attack-severity">
-          <span class="severity-badge ${severityClass}">${severityClass.toUpperCase()}</span>
-        </div>
-      </div>
-    `;
+    const card = createAttackCard(attack);
+    html += card.outerHTML;
   });
   
   html += '</div>';
   attacksContainer.innerHTML = html;
+}
+
+function createAttackCard(attack) {
+  const card = document.createElement('div');
+  card.className = `attack-card ${attack.severity || 'medium'}`;
+  
+  const time = new Date(attack.timestamp).toLocaleTimeString();
+  const target = attack.target.length > 50 ? attack.target.substring(0, 50) + '...' : attack.target;
+  
+  // Si es un ataque detectado por ML, mostrar información adicional
+  let extraInfo = '';
+  if (attack.category === 'ML Detected') {
+    extraInfo = `
+      <div class="ml-info">
+        <span class="ml-badge">🤖 ML</span>
+        <span>Confianza: ${(attack.confidence * 100).toFixed(1)}%</span>
+        <span>Prob. Ataque: ${(attack.attackProbability * 100).toFixed(1)}%</span>
+      </div>
+    `;
+  }
+  
+  card.innerHTML = `
+    <div class="attack-header">
+      <span class="attack-type">${attack.category}</span>
+      <span class="attack-time">${time}</span>
+    </div>
+    <div class="attack-target">${target}</div>
+    ${extraInfo}
+    <div class="attack-severity">
+      <span class="severity-badge ${attack.severity}">${attack.severity || 'medium'}</span>
+    </div>
+  `;
+  
+  return card;
 }
 
 // Display traffic
@@ -221,29 +270,220 @@ function openDashboard() {
 
 // Export network data
 function exportNetworkData() {
-  chrome.runtime.sendMessage(
-    { action: 'getNetworkStats' },
-    (stats) => {
-      chrome.runtime.sendMessage(
-        { action: 'getAttacks' },
-        (attacks) => {
-          const data = {
-            timestamp: new Date().toISOString(),
-            stats: stats,
-            attacks: attacks
-          };
+  console.log('Exportando datos de tráfico...');
+  
+  // Timeout para detectar si no hay respuesta
+  let responseReceived = false;
+  const timeout = setTimeout(() => {
+    if (!responseReceived) {
+      console.error('Timeout: No se recibió respuesta del background');
+      alert('Error: El background script no responde. Intenta recargar la extensión.');
+    }
+  }, 5000); // 5 segundos de timeout
+  
+  try {
+    chrome.runtime.sendMessage(
+      { action: 'exportTrafficData' },
+      (data) => {
+        responseReceived = true;
+        clearTimeout(timeout);
+        
+        console.log('Respuesta recibida:', data);
+        
+        if (chrome.runtime.lastError) {
+          console.error('Error en runtime:', chrome.runtime.lastError);
+          alert('Error al exportar: ' + chrome.runtime.lastError.message + '\n\nIntenta:\n1. Recargar la extensión\n2. Navegar por sitios web primero\n3. Verificar que el monitoreo esté activo');
+          return;
+        }
+        
+        if (data && data.error) {
+          console.error('Error en exportación:', data.error);
+          alert('Error: ' + data.error);
+          return;
+        }
+        
+        if (data && data.traffic) {
+          console.log(`Exportando ${data.traffic.length} requests`);
           
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          if (data.traffic.length === 0) {
+            alert('No hay tráfico capturado aún.\n\nPara generar tráfico:\n1. Asegúrate de que el monitoreo esté ACTIVO\n2. Navega por algunos sitios web\n3. Espera unos segundos\n4. Intenta exportar nuevamente');
+            return;
+          }
+          
+          // Exportar JSON
+          const jsonData = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonData], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `network-analysis-${Date.now()}.json`;
+          a.download = `traffic-export-${Date.now()}.json`;
+          document.body.appendChild(a);
           a.click();
+          document.body.removeChild(a);
           URL.revokeObjectURL(url);
+          
+          // También exportar como CSV HTTP (datos raw)
+          exportAsCSV(data.traffic);
+          
+          // Exportar CSV en formato KDD para el modelo ML
+          exportAsKDDCSV(data.traffic);
+          
+          console.log('Exportación completada');
+          alert(`✅ Exportación exitosa!\n\n${data.traffic.length} requests exportados\n\nArchivos descargados:\n- traffic-export-[timestamp].json (Datos completos)\n- traffic-data-[timestamp].csv (HTTP raw)\n- traffic-kdd-[timestamp].csv (Para modelo ML)`);
+        } else {
+          console.warn('No hay datos para exportar');
+          alert('No hay datos de tráfico para exportar.\n\nAsegúrate de que:\n1. El monitoreo esté activo\n2. Hayas navegado por sitios web\n3. Haya tráfico capturado');
         }
-      );
+      }
+    );
+  } catch (error) {
+    clearTimeout(timeout);
+    console.error('Error al enviar mensaje:', error);
+    alert('Error inesperado: ' + error.message);
+  }
+}
+
+// Export traffic as CSV for ML analysis (HTTP raw data)
+function exportAsCSV(traffic) {
+  if (!traffic || traffic.length === 0) {
+    console.warn('No hay datos de tráfico para exportar como CSV');
+    return;
+  }
+  
+  try {
+    console.log(`Exportando ${traffic.length} requests como CSV HTTP`);
+    
+    // Headers CSV
+    const headers = ['url', 'method', 'statusCode', 'timestamp', 'duration', 'requestSize', 'responseSize', 'domain'];
+    let csv = headers.join(',') + '\n';
+    
+    // Data rows
+    traffic.forEach(req => {
+      const row = [
+        `"${(req.url || '').replace(/"/g, '""')}"`, // Escapar comillas dobles
+        req.method || '',
+        req.statusCode || '',
+        req.timestamp || '',
+        req.duration || '',
+        req.requestSize || '',
+        req.responseSize || '',
+        req.domain || ''
+      ];
+      csv += row.join(',') + '\n';
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `traffic-data-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('CSV HTTP exportado exitosamente');
+  } catch (error) {
+    console.error('Error al exportar CSV:', error);
+    alert('Error al exportar CSV: ' + error.message);
+  }
+}
+
+// Export traffic as KDD format CSV for ML model
+async function exportAsKDDCSV(traffic) {
+  if (!traffic || traffic.length === 0) {
+    console.warn('No hay datos de tráfico para exportar como KDD CSV');
+    return;
+  }
+  
+  try {
+    console.log(`Convirtiendo ${traffic.length} requests a formato KDD...`);
+    
+    // Enviar al backend para convertir a KDD
+    const response = await fetch('http://localhost:5000/api/predict-realtime', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ traffic: traffic })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Error al convertir a formato KDD');
     }
-  );
+    
+    const result = await response.json();
+    
+    // El backend ya tiene las features KDD, pero necesitamos exportarlas
+    // Por ahora, crear un CSV con las predicciones y probabilidades
+    console.log('Generando CSV en formato KDD...');
+    
+    // Crear endpoint para exportar features KDD
+    const exportResponse = await fetch('http://localhost:5000/api/export-kdd-features', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ traffic: traffic })
+    });
+    
+    if (!exportResponse.ok) {
+      console.warn('Endpoint de exportación KDD no disponible, usando predicciones');
+      // Fallback: exportar solo las predicciones
+      exportPredictionsCSV(result.predictions);
+      return;
+    }
+    
+    const kddData = await exportResponse.text();
+    
+    const blob = new Blob([kddData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `traffic-kdd-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('CSV KDD exportado exitosamente');
+  } catch (error) {
+    console.error('Error al exportar KDD CSV:', error);
+    console.warn('No se pudo exportar en formato KDD, el backend puede no estar disponible');
+  }
+}
+
+// Export predictions as CSV (fallback)
+function exportPredictionsCSV(predictions) {
+  try {
+    const headers = ['url', 'prediction', 'confidence', 'attack_probability', 'normal_probability'];
+    let csv = headers.join(',') + '\n';
+    
+    predictions.forEach(pred => {
+      const row = [
+        `"${(pred.url || '').replace(/"/g, '""')}"`,
+        pred.prediction || '',
+        pred.confidence || '',
+        pred.attack_probability || '',
+        pred.normal_probability || ''
+      ];
+      csv += row.join(',') + '\n';
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `traffic-predictions-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('CSV de predicciones exportado');
+  } catch (error) {
+    console.error('Error al exportar predicciones:', error);
+  }
 }
 
 // Start auto-update

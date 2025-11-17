@@ -221,6 +221,7 @@ def menu():
     print("3. Suspicious Patterns (Patrones Sospechosos)")
     print("4. Mixed Attack (Ataque Mixto)")
     print("5. Ataque Personalizado")
+    print(f"{COLORS['BLUE']}6. 🤖 Probar Endpoint ML (Recomendado primero){COLORS['RESET']}")
     print("0. Salir")
     
     return input("\nOpción: ").strip()
@@ -283,11 +284,109 @@ def main():
             simulate_mixed_attack()
         elif choice == "5":
             custom_attack()
+        elif choice == "6":
+            test_ml_endpoint()
         else:
             print_info("\nOpción inválida", 'RED')
         
         print("\n" + "-"*70)
         input("\nPresiona ENTER para continuar...")
+
+def test_ml_endpoint():
+    """
+    Probar el endpoint de predicción ML en tiempo real
+    """
+    print_info("\n[6] Probando Endpoint de Predicción ML...", 'BLUE')
+    print_info("    Este test valida que el modelo ML esté funcionando", 'YELLOW')
+    
+    ML_API_URL = "http://localhost:5000/api/predict-realtime"
+    
+    # Verificar que el backend esté disponible
+    try:
+        health_response = requests.get("http://localhost:5000/api/health", timeout=5)
+        if not health_response.ok:
+            print_info("    ❌ Backend no disponible", 'RED')
+            return
+        print_info("    ✅ Backend disponible", 'GREEN')
+    except:
+        print_info("    ❌ No se puede conectar al backend en http://localhost:5000", 'RED')
+        print_info("    💡 Ejecuta: cd web_app/backend && python app.py", 'YELLOW')
+        return
+    
+    # Preparar datos de tráfico HTTP simulado
+    print_info("\n    Generando tráfico HTTP simulado...", 'YELLOW')
+    
+    traffic_data = []
+    base_time = int(time.time() * 1000)
+    
+    # Tráfico normal
+    for i in range(5):
+        traffic_data.append({
+            "url": f"http://localhost:3000/page{i}",
+            "method": "GET",
+            "statusCode": 200,
+            "timestamp": base_time + (i * 1000),
+            "duration": 150,
+            "requestSize": 300,
+            "responseSize": 1500,
+            "domain": "localhost"
+        })
+    
+    # Intentos de ataque (login fallidos)
+    for i in range(5):
+        traffic_data.append({
+            "url": "http://localhost:3000/api/login",
+            "method": "POST",
+            "statusCode": 401,
+            "timestamp": base_time + ((i + 5) * 500),
+            "duration": 200,
+            "requestSize": 512,
+            "responseSize": 128,
+            "domain": "localhost"
+        })
+    
+    print_info(f"    Enviando {len(traffic_data)} requests al modelo ML...", 'YELLOW')
+    
+    try:
+        response = requests.post(
+            ML_API_URL,
+            json={"traffic": traffic_data},
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print_info(f"    ❌ Error: {response.status_code}", 'RED')
+            print_info(f"    {response.text}", 'RED')
+            return
+        
+        result = response.json()
+        
+        # Mostrar resultados
+        print_info("\n    🤖 Predicciones del Modelo ML:", 'GREEN')
+        print_info(f"       Total requests: {result['total_requests']}", 'RESET')
+        print_info(f"       Ataques detectados: {result['summary']['attacks_detected']}", 'RED')
+        print_info(f"       Tráfico normal: {result['summary']['normal_traffic']}", 'GREEN')
+        print_info(f"       % Ataques: {result['summary']['attack_percentage']:.1f}%", 'YELLOW')
+        print_info(f"       Nivel de amenaza: {result['summary']['threat_level'].upper()}", 
+                  'RED' if result['summary']['threat_level'] == 'high' else 'YELLOW')
+        
+        print_info("\n    🔍 Primeras 3 predicciones:", 'BLUE')
+        for i, pred in enumerate(result['predictions'][:3]):
+            color = 'RED' if pred['prediction'] == 'attack' else 'GREEN'
+            url_short = pred['url'][:40] + '...' if len(pred['url']) > 40 else pred['url']
+            print_info(f"       [{i+1}] {pred['prediction'].upper()}: {url_short}", color)
+            print_info(f"           Confianza: {pred['confidence']*100:.1f}% | Prob. Ataque: {pred['attack_probability']*100:.1f}%", 'RESET')
+        
+        print_info("\n    ✅ ¡Modelo ML funcionando correctamente!", 'GREEN')
+        print_info("    👉 La extensión de Chrome usará este endpoint para detectar ataques", 'BLUE')
+        
+    except requests.exceptions.ConnectionError:
+        print_info("    ❌ No se puede conectar al endpoint ML", 'RED')
+    except Exception as e:
+        print_info(f"    ❌ Error: {str(e)}", 'RED')
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     try:

@@ -34,7 +34,11 @@ function initNetworkMonitor() {
     networkMonitor = new NetworkMonitor();
     console.log('Network Monitor started');
   }
+  return networkMonitor;
 }
+
+// Asegurarse de que el monitor esté inicializado al cargar
+initNetworkMonitor();
 
 // Listen for messages from popup or content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -90,6 +94,49 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
       sendResponse({ enabled: newState });
     });
+    return true;
+  }
+  
+  if (request.action === 'exportTrafficData') {
+    console.log('Background: Recibida solicitud de exportación');
+    
+    // Asegurar que el monitor esté inicializado
+    if (!networkMonitor) {
+      console.log('Background: Inicializando monitor...');
+      initNetworkMonitor();
+    }
+    
+    if (networkMonitor) {
+      try {
+        const exportData = networkMonitor.exportTrafficData();
+        console.log('Background: Datos exportados:', {
+          trafficCount: exportData.traffic?.length || 0,
+          hasStats: !!exportData.stats,
+          hasAttacks: !!exportData.attacks
+        });
+        
+        // Enviar respuesta inmediatamente
+        sendResponse(exportData);
+      } catch (error) {
+        console.error('Background: Error al exportar:', error);
+        sendResponse({ error: error.message || 'Error desconocido' });
+      }
+    } else {
+      console.error('Background: No se pudo inicializar el monitor');
+      sendResponse({ error: 'Monitor not initialized' });
+    }
+    
+    // IMPORTANTE: Retornar true para mantener el canal abierto
+    return true;
+  }
+  
+  if (request.action === 'toggleML') {
+    if (networkMonitor) {
+      networkMonitor.setMLEnabled(request.enabled);
+      sendResponse({ success: true, enabled: request.enabled });
+    } else {
+      sendResponse({ error: 'Monitor not initialized' });
+    }
     return true;
   }
 });

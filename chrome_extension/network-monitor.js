@@ -6,18 +6,24 @@
 class NetworkMonitor {
   constructor() {
     this.requests = [];
+    this.requestDetails = new Map(); // Almacenar detalles completos de requests
     this.attackPatterns = {
       ddos: [],
       bruteForce: [],
       portScan: [],
-      suspicious: []
+      suspicious: [],
+      mlDetected: [] // Ataques detectados por ML
     };
     this.stats = {
       totalRequests: 0,
       blockedRequests: 0,
       suspiciousActivity: 0,
+      mlPredictions: 0,
       lastUpdate: Date.now()
     };
+    this.mlEnabled = true; // Flag para habilitar/deshabilitar ML
+    this.mlBatchSize = 10; // Enviar al ML cada N requests
+    this.mlApiUrl = 'http://localhost:5000/api/predict-realtime';
     
     // Configuración de detección (UMBRALES REDUCIDOS PARA PRUEBAS)
     this.config = {
@@ -101,6 +107,8 @@ class NetworkMonitor {
   }
   
   onRequest(details) {
+    const startTime = Date.now();
+    
     const request = {
       id: details.requestId,
       url: details.url,
@@ -108,8 +116,19 @@ class NetworkMonitor {
       type: details.type,
       timestamp: details.timeStamp,
       tabId: details.tabId,
-      initiator: details.initiator
+      initiator: details.initiator,
+      startTime: startTime
     };
+    
+    // Almacenar detalles completos para ML
+    this.requestDetails.set(details.requestId, {
+      url: details.url,
+      method: details.method,
+      timestamp: details.timeStamp,
+      startTime: startTime,
+      requestSize: this.estimateRequestSize(details),
+      domain: this.extractDomain(details.url)
+    });
     
     this.requests.push(request);
     this.stats.totalRequests++;
@@ -119,7 +138,13 @@ class NetworkMonitor {
       this.requests.shift();
     }
     
-    // Detección inmediata
+    // Limpiar requestDetails antiguos
+    if (this.requestDetails.size > 1000) {
+      const oldestKey = this.requestDetails.keys().next().value;
+      this.requestDetails.delete(oldestKey);
+    }
+    
+    // Detección inmediata con reglas
     this.detectDDoS(request);
     this.detectSuspiciousPatterns(request);
     
@@ -128,9 +153,22 @@ class NetworkMonitor {
   }
   
   onResponse(details) {
-    // Detectar intentos de fuerza bruta (401, 403)
-    if (details.statusCode === 401 || details.statusCode === 403) {
-      this.detectBruteForce(details);
+    // Actualizar detalles del request con información de respuesta
+    if (this.requestDetails.has(details.requestId)) {
+      const requestInfo = this.requestDetails.get(details.requestId);
+      requestInfo.statusCode = details.statusCode;
+      requestInfo.duration = Date.now() - requestInfo.startTime;
+      requestInfo.responseSize = this.estimateResponseSize(details);
+      
+      // Detectar intentos de fuerza bruta (401, 403)
+      if (details.statusCode === 401 || details.statusCode === 403) {
+        this.detectBruteForce(details);
+      }
+      
+      // Enviar al ML si tenemos suficientes requests
+      if (this.mlEnabled && this.requestDetails.size >= this.mlBatchSize) {
+        this.sendToMLModel();
+      }
     }
   }
   
@@ -299,6 +337,129 @@ class NetworkMonitor {
     }
   }
   
+  // Estimar tamaño de request
+  estimateRequestSize(details) {
+    // Estimación aproximada basada en URL y método
+    let size = details.url.length;
+    if (details.requestBody) {
+      if (details.requestBody.raw) {
+        size += details.requestBody.raw.reduce((acc, item) => acc + (item.bytes?.byteLength || 0), 0);
+      }
+      if (details.requestBody.formData) {
+        size += JSON.stringify(details.requestBody.formData).length;
+      }
+    }
+    return size;
+  }
+  
+  // Estimar tamaño de response
+  estimateResponseSize(details) {
+    // Chrome no proporciona responseSize directamente en webRequest
+    // Estimación aproximada basada en headers
+    let size = 0;
+    if (details.responseHeaders) {
+      const contentLength = details.responseHeaders.find(h => h.name.toLowerCase() === 'content-length');
+      if (contentLength) {
+        size = parseInt(contentLength.value) || 0;
+      }
+    }
+    return size || 1000; // Default 1KB si no se puede determinar
+  }
+  
+  // Enviar tráfico al modelo ML para predicción
+  async sendToMLModel() {
+    if (!this.mlEnabled || this.requestDetails.size === 0) return;
+    
+    try {
+      // Preparar datos para el modelo
+      const trafficData = Array.from(this.requestDetails.values())
+        .filter(req => req.statusCode !== undefined) // Solo requests completados
+        .slice(-this.mlBatchSize); // Últimos N requests
+      
+      if (trafficData.length === 0) return;
+      
+      console.log(`🤖 Enviando ${trafficData.length} requests al modelo ML...`);
+      
+      const response = await fetch(this.mlApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ traffic: trafficData })
+      });
+      
+      if (!response.ok) {
+        console.error('❌ Error en predicción ML:', response.statusText);
+        return;
+      }
+      
+      const result = await response.json();
+      this.processMLPredictions(result);
+      
+    } catch (error) {
+      console.error('❌ Error al conectar con modelo ML:', error);
+      // No deshabilitar ML, solo loggear el error
+    }
+  }
+  
+  // Procesar predicciones del modelo ML
+  processMLPredictions(result) {
+    console.log('🤖 Predicciones ML recibidas:', result.summary);
+    
+    this.stats.mlPredictions += result.total_requests;
+    
+    // Procesar cada predicción
+    result.predictions.forEach(pred => {
+      if (pred.prediction === 'attack' && pred.attack_probability > 0.7) {
+        const attack = {
+          type: 'ML Detected Attack',
+          target: pred.url,
+          confidence: pred.confidence,
+          attackProbability: pred.attack_probability,
+          timestamp: Date.now(),
+          severity: pred.attack_probability > 0.9 ? 'critical' : 'high'
+        };
+        
+        this.attackPatterns.mlDetected.push(attack);
+        this.stats.suspiciousActivity++;
+        
+        // Notificar ataque detectado por ML
+        this.notifyMLAttack(attack);
+        
+        console.warn('🚨 Ataque detectado por ML:', attack);
+      }
+    });
+    
+    // Guardar resumen en storage
+    chrome.storage.local.set({
+      mlLastPrediction: {
+        timestamp: Date.now(),
+        summary: result.summary,
+        threatLevel: result.summary.threat_level
+      }
+    });
+    
+    // Actualizar badge si hay amenazas
+    if (result.summary.threat_level === 'high') {
+      this.updateBadge();
+    }
+  }
+  
+  // Notificar ataque detectado por ML
+  notifyMLAttack(attack) {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: `🤖 ${attack.type}`,
+      message: `Target: ${attack.target}\nConfianza: ${(attack.confidence * 100).toFixed(1)}%\nProbabilidad de ataque: ${(attack.attackProbability * 100).toFixed(1)}%`,
+      priority: 2
+    });
+    
+    // Actualizar badge
+    chrome.action.setBadgeText({ text: '🤖' });
+    chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
+  }
+  
   // Obtener estadísticas
   getStats() {
     return {
@@ -306,7 +467,8 @@ class NetworkMonitor {
       attacks: {
         ddos: this.attackPatterns.ddos.length,
         bruteForce: this.attackPatterns.bruteForce.length,
-        suspicious: this.attackPatterns.suspicious.length
+        suspicious: this.attackPatterns.suspicious.length,
+        mlDetected: this.attackPatterns.mlDetected.length
       },
       recentRequests: this.requests.slice(-50) // Últimas 50
     };
@@ -317,26 +479,47 @@ class NetworkMonitor {
     return {
       ddos: this.attackPatterns.ddos.slice(-10),
       bruteForce: this.attackPatterns.bruteForce.slice(-10),
-      suspicious: this.attackPatterns.suspicious.slice(-10)
+      suspicious: this.attackPatterns.suspicious.slice(-10),
+      mlDetected: this.attackPatterns.mlDetected.slice(-10)
     };
   }
   
   // Limpiar todo
   clear() {
     this.requests = [];
+    this.requestDetails.clear();
     this.attackPatterns = {
       ddos: [],
       bruteForce: [],
       portScan: [],
-      suspicious: []
+      suspicious: [],
+      mlDetected: []
     };
     this.stats = {
       totalRequests: 0,
       blockedRequests: 0,
       suspiciousActivity: 0,
+      mlPredictions: 0,
       lastUpdate: Date.now()
     };
     chrome.action.setBadgeText({ text: '' });
+  }
+  
+  // Habilitar/deshabilitar ML
+  setMLEnabled(enabled) {
+    this.mlEnabled = enabled;
+    console.log(`🤖 Detección ML ${enabled ? 'habilitada' : 'deshabilitada'}`);
+  }
+  
+  // Exportar tráfico para análisis offline
+  exportTrafficData() {
+    const data = Array.from(this.requestDetails.values());
+    return {
+      traffic: data,
+      stats: this.stats,
+      attacks: this.attackPatterns,
+      exportedAt: new Date().toISOString()
+    };
   }
 }
 
