@@ -34,10 +34,15 @@ const FileUpload = ({ onFileUpload, loading }) => {
   };
 
   const handleFile = (file) => {
-    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+    const name = file.name.toLowerCase();
+    const mime = file.type;
+    const isCsv = mime === 'text/csv' || name.endsWith('.csv');
+    const isTxt = mime === 'text/plain' || name.endsWith('.txt');
+
+    if (isCsv || isTxt) {
       setSelectedFile(file);
     } else {
-      alert('Por favor selecciona un archivo CSV');
+      alert('Por favor selecciona un archivo CSV o TXT');
     }
   };
 
@@ -84,7 +89,7 @@ const FileUpload = ({ onFileUpload, loading }) => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.txt,text/csv,text/plain"
             onChange={handleChange}
             className="hidden"
             id="file-upload"
@@ -94,7 +99,7 @@ const FileUpload = ({ onFileUpload, loading }) => {
             <div>
               <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <p className="text-slate-700 font-medium mb-2">
-                Arrastra y suelta tu archivo CSV aquí
+                Arrastra y suelta tu archivo CSV o TXT aquí
               </p>
               <p className="text-sm text-slate-500 mb-4">o</p>
               <label
@@ -105,7 +110,7 @@ const FileUpload = ({ onFileUpload, loading }) => {
                 Seleccionar archivo
               </label>
               <p className="text-xs text-slate-500 mt-4">
-                Formatos soportados: CSV
+                Formatos soportados: CSV, TXT
               </p>
             </div>
           ) : (
@@ -200,3 +205,4 @@ const FileUpload = ({ onFileUpload, loading }) => {
 };
 
 export default FileUpload;
+

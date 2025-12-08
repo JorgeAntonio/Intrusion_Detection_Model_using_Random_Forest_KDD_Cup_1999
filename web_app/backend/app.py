@@ -23,6 +23,21 @@ MODEL_PATH = os.path.join(BASE_DIR, "output", "gradient_boosting_kdd_model.jobli
 METRICS_PATH = os.path.join(BASE_DIR, "output", "gradient_boosting_kdd_metrics.txt")
 PLOTS_DIR = os.path.join(BASE_DIR, "output", "plots")
 
+# Columnas originales del dataset KDD (crudo)
+RAW_COLUMNS = [
+    "duration","protocol_type","service","flag","src_bytes","dst_bytes","land","wrong_fragment",
+    "urgent","hot","num_failed_logins","logged_in","num_compromised","root_shell","su_attempted",
+    "num_root","num_file_creations","num_shells","num_access_files","num_outbound_cmds",
+    "is_host_login","is_guest_login","count","srv_count","serror_rate","srv_serror_rate",
+    "rerror_rate","srv_rerror_rate","same_srv_rate","diff_srv_rate","srv_diff_host_rate",
+    "dst_host_count","dst_host_srv_count","dst_host_same_srv_rate","dst_host_diff_srv_rate",
+    "dst_host_same_src_port_rate","dst_host_srv_diff_host_rate","dst_host_serror_rate",
+    "dst_host_srv_serror_rate","dst_host_rerror_rate","dst_host_srv_rerror_rate","class","difficulty"
+]
+
+CATEGORICAL_COLUMNS = ["protocol_type", "service", "flag"]
+
+
 # Cargar modelo al iniciar
 print("Cargando modelo Gradient Boosting...")
 if not os.path.exists(MODEL_PATH):
@@ -30,6 +45,30 @@ if not os.path.exists(MODEL_PATH):
 
 model = joblib.load(MODEL_PATH)
 print("Modelo cargado exitosamente")
+
+MODEL_FEATURES = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else None
+
+def preprocess_raw_file(file_obj):
+    """Procesa un TXT crudo aplicando el mismo flujo usado en entrenamiento."""
+    df = pd.read_csv(file_obj, header=None, names=RAW_COLUMNS, low_memory=False)
+    return preprocess_raw_df(df)
+
+def preprocess_raw_df(df):
+    """Procesa un DataFrame crudo (txt/csv) aplicando el mismo flujo usado en entrenamiento."""
+    df["binario"] = (df["class"] != "normal").astype(int)
+    df = df.drop(columns=["class"], errors="ignore")
+    df = pd.get_dummies(df, columns=CATEGORICAL_COLUMNS, dtype=int)
+    return df
+
+def align_features(df):
+    """Alinea columnas al orden/espacio del modelo (rellena faltantes con 0, descarta extras)."""
+    if MODEL_FEATURES is None:
+        return df
+    aligned = pd.DataFrame(0, index=df.index, columns=MODEL_FEATURES)
+    for col in df.columns:
+        if col in aligned.columns:
+            aligned[col] = df[col]
+    return aligned
 
 
 @app.route('/api/health', methods=['GET'])
@@ -40,7 +79,6 @@ def health_check():
         'model': 'Gradient Boosting Classifier',
         'model_path': MODEL_PATH
     })
-
 
 @app.route('/api/model-info', methods=['GET'])
 def get_model_info():
@@ -78,7 +116,6 @@ def get_model_info():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """Realizar predicciones sobre datos cargados."""
@@ -92,8 +129,16 @@ def predict():
         if file.filename == '':
             return jsonify({'error': 'Nombre de archivo vacío'}), 400
         
-        # Leer el archivo CSV
-        df = pd.read_csv(file)
+        extension = os.path.splitext(file.filename)[1].lower()
+
+        # Seleccionar flujo según extensión/contenido
+        if extension in ['.txt', '.data']:
+            df = preprocess_raw_file(file)
+        else:
+            df = pd.read_csv(file)
+            is_raw_csv = ('class' in df.columns) or all(col in df.columns for col in CATEGORICAL_COLUMNS)
+            if is_raw_csv:
+                df = preprocess_raw_df(df)
         
         # Verificar si tiene la columna 'binario' (etiquetas reales)
         has_labels = 'binario' in df.columns
@@ -105,9 +150,12 @@ def predict():
             y_true = None
             X = df
         
+        # Alinear columnas al modelo
+        X_aligned = align_features(X)
+        
         # Realizar predicciones
-        y_pred = model.predict(X)
-        y_proba = model.predict_proba(X)
+        y_pred = model.predict(X_aligned)
+        y_proba = model.predict_proba(X_aligned)
         
         # Preparar respuesta
         response = {
@@ -160,7 +208,6 @@ def predict():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/feature-importance', methods=['GET'])
 def get_feature_importance():
     """Obtener la importancia de características del modelo."""
@@ -186,7 +233,6 @@ def get_feature_importance():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/plots', methods=['GET'])
 def list_plots():
     """Listar los plots disponibles."""
@@ -206,7 +252,6 @@ def list_plots():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/plot/<filename>', methods=['GET'])
 def get_plot(filename):
     """Obtener el contenido HTML de un plot específico."""
@@ -223,7 +268,6 @@ def get_plot(filename):
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 if __name__ == '__main__':
     print("\n" + "="*70)
