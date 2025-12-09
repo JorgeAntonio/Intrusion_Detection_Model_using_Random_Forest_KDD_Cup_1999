@@ -67,10 +67,10 @@ const FileUpload = ({ onFileUpload, loading }) => {
             <Upload className="w-8 h-8 text-blue-600" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">
-            Cargar Datos para Análisis
+            Cargar Datos para la Predicción
           </h2>
           <p className="text-slate-600">
-            Sube un archivo CSV con datos de red para detectar posibles intrusiones
+            Sube un archivo CSV o TXT con datos de red para detectar posibles intrusiones
           </p>
         </div>
 
@@ -180,7 +180,7 @@ const FileUpload = ({ onFileUpload, loading }) => {
       </div>
 
       {/* Instructions */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+      {/* <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
           <FileText className="w-5 h-5 mr-2" />
           Formato del archivo
@@ -199,7 +199,7 @@ const FileUpload = ({ onFileUpload, loading }) => {
             <span>El modelo clasificará cada registro como Normal (0) o Ataque (1)</span>
           </li>
         </ul>
-      </div>
+      </div> */}
     </div>
   );
 };
