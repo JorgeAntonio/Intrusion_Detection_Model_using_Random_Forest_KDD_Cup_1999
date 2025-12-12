@@ -26,6 +26,7 @@ import {
 
 const Dashboard = ({ predictions }) => {
   const { prediction_summary, evaluation, total_samples } = predictions;
+  const hasAttacks = prediction_summary.attack > 0;
 
   // Datos para gráfico de pie
   const pieData = [
@@ -306,32 +307,30 @@ const Dashboard = ({ predictions }) => {
 
       {/* Status Alert */}
       <div className={`rounded-xl border p-6 ${
-        prediction_summary.attack_percentage > 50
+        hasAttacks
           ? 'bg-red-50 border-red-200'
           : 'bg-green-50 border-green-200'
       }`}>
         <div className="flex items-start space-x-3">
-          {prediction_summary.attack_percentage > 50 ? (
+          {hasAttacks ? (
             <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5" />
           ) : (
             <CheckCircle className="w-6 h-6 text-green-600 mt-0.5" />
           )}
           <div>
             <h3 className={`font-semibold mb-2 ${
-              prediction_summary.attack_percentage > 50 ? 'text-red-900' : 'text-green-900'
+              hasAttacks ? 'text-red-900' : 'text-green-900'
             }`}>
-              {prediction_summary.attack_percentage > 50 
+              {hasAttacks
                 ? '⚠️ Alto nivel de amenazas detectado'
-                : '✅ Nivel de amenazas bajo'
-              }
+                : '✅ Nivel de amenazas bajo'}
             </h3>
             <p className={`text-sm ${
-              prediction_summary.attack_percentage > 50 ? 'text-red-800' : 'text-green-800'
+              hasAttacks ? 'text-red-800' : 'text-green-800'
             }`}>
-              {prediction_summary.attack_percentage > 50
+              {hasAttacks
                 ? `Se detectaron ${prediction_summary.attack} ataques (${prediction_summary.attack_percentage.toFixed(1)}% del tráfico). Se recomienda revisar los registros y tomar medidas de seguridad.`
-                : `El tráfico analizado muestra ${prediction_summary.normal} conexiones normales (${prediction_summary.normal_percentage.toFixed(1)}%). El sistema está operando dentro de parámetros normales.`
-              }
+                : `El tráfico analizado muestra ${prediction_summary.normal} conexiones normales (${prediction_summary.normal_percentage.toFixed(1)}%). El sistema está operando dentro de parámetros normales.`}
             </p>
           </div>
         </div>

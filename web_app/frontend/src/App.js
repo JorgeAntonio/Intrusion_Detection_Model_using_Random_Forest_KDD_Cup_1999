@@ -155,7 +155,7 @@ function App() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <div className="grid grid-cols-1 gap-6">
             {activeTab === 'upload' && (
-              <div className="bg-white/5 rounded-2xl border border-white/10 shadow-2xl shadow-blue-900/30 backdrop-blur-xl p-6">
+              <div className="max-w-5xl mx-auto bg-white/5 rounded-2xl border border-white/10 shadow-2xl shadow-blue-900/30 backdrop-blur-xl p-5 sm:p-6">
                 <FileUpload 
                   onFileUpload={handleFileUpload} 
                   loading={loading}
@@ -164,13 +164,13 @@ function App() {
             )}
             
             {activeTab === 'model' && modelInfo && (
-              <div className="bg-white/5 rounded-2xl border border-white/10 shadow-2xl shadow-blue-900/30 backdrop-blur-xl p-6">
+              <div className="max-w-5xl mx-auto bg-white/5 rounded-2xl border border-white/10 shadow-2xl shadow-blue-900/30 backdrop-blur-xl p-5 sm:p-6">
                 <ModelInfo modelInfo={modelInfo} />
               </div>
             )}
             
             {activeTab === 'results' && predictions && (
-              <div className="bg-white/5 rounded-2xl border border-white/10 shadow-2xl shadow-blue-900/30 backdrop-blur-xl p-6">
+              <div className="max-w-5xl mx-auto bg-white/5 rounded-2xl border border-white/10 shadow-2xl shadow-blue-900/30 backdrop-blur-xl p-5 sm:p-6">
                 <Dashboard predictions={predictions} />
               </div>
             )}

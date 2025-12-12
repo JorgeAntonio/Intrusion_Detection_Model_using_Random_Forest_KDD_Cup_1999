@@ -60,8 +60,8 @@ const FileUpload = ({ onFileUpload, loading }) => {
   };
 
   return (
-    <div className="animate-fadeIn">
-      <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
+    <div className="animate-fadeIn max-w-3xl mx-auto">
+      <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 sm:p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
             <Upload className="w-8 h-8 text-blue-600" />
@@ -76,7 +76,7 @@ const FileUpload = ({ onFileUpload, loading }) => {
 
         {/* Drag and Drop Area */}
         <div
-          className={`relative border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+          className={`relative border-2 border-dashed rounded-lg p-6 sm:p-6 text-center transition-colors ${
             dragActive
               ? 'border-blue-500 bg-blue-50'
               : 'border-slate-300 bg-slate-50 hover:border-slate-400'
